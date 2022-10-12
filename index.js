@@ -1,72 +1,130 @@
 import {
-  AmbientLight,
-  AxesHelper,
-  DirectionalLight,
-  GridHelper,
-  PerspectiveCamera,
   Scene,
+  BoxGeometry,
+  MeshBasicMaterial,
+  Mesh,
+  PerspectiveCamera,
   WebGLRenderer,
+  Vector2,
+  Vector3,
+  Vector4,
+  Quaternion,
+  Matrix4,
+  Spherical,
+  Box3,
+  Sphere,
+  Raycaster,
+  MathUtils,
+  DirectionalLight,
+  AmbientLight,
+  MOUSE,
+  Clock,
+  Color
 } from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-//Creates the Three.js scene
+import CameraControls from 'camera-controls';
+
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+const subsetOfTHREE = {
+  MOUSE,
+  Vector2,
+  Vector3,
+  Vector4,
+  Quaternion,
+  Matrix4,
+  Spherical,
+  Box3,
+  Sphere,
+  Raycaster,
+  MathUtils: {
+    DEG2RAD: MathUtils.DEG2RAD,
+    clamp: MathUtils.clamp
+  }
+};
+
+const canvas = document.getElementById("three-canvas");
+
+// The scene
 const scene = new Scene();
 
-//Object to store the size of the viewport
-const size = {
-  width: window.innerWidth,
-  height: window.innerHeight,
-};
+scene.background = new Color( 0xeeeeee );
 
-//Creates the camera (point of view of the user)
-const camera = new PerspectiveCamera(75, size.width / size.height);
-camera.position.z = 15;
-camera.position.y = 13;
-camera.position.x = 8;
+// The Camera
 
-//Creates the lights of the scene
-const lightColor = 0xffffff;
+const camera = new PerspectiveCamera(
+  75,
+  canvas.clientWidth / canvas.clientHeight
+);
+scene.add(camera);
 
-const ambientLight = new AmbientLight(lightColor, 0.5);
-scene.add(ambientLight);
+// The Renderer
 
-const directionalLight = new DirectionalLight(lightColor, 2);
-directionalLight.position.set(0, 10, 0);
-scene.add(directionalLight);
+const renderer = new WebGLRenderer({
+  canvas: canvas,
+});
 
-//Sets up the renderer, fetching the canvas of the HTML
-const threeCanvas = document.getElementById("three-canvas");
-const renderer = new WebGLRenderer({ canvas: threeCanvas, alpha: true });
-renderer.setSize(size.width, size.height);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
-//Creates grids and axes in the scene
-const grid = new GridHelper(50, 30);
-scene.add(grid);
+window.addEventListener("resize", () => {
+  camera.aspect = canvas.clientWidth / canvas.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+});
 
-const axes = new AxesHelper();
-axes.material.depthTest = false;
-axes.renderOrder = 1;
-scene.add(axes);
+// Lights
 
-//Creates the orbit controls (to navigate the scene)
-const controls = new OrbitControls(camera, threeCanvas);
-controls.enableDamping = true;
-controls.target.set(-2, 0, 0);
+const light = new DirectionalLight(0xffffff, 1);
+light.position.set(1, 1, 0.5);
+const baseLight = new AmbientLight(0xffffff, 1);
+scene.add(light, baseLight);
 
-//Animation loop
-const animate = () => {
-  controls.update();
-  renderer.render(scene, camera);
+// Controls
+
+CameraControls.install( { THREE: subsetOfTHREE } ); 
+const clock = new Clock();
+const cameraControls = new CameraControls(camera, canvas);
+cameraControls.dollyToCursor = true;
+
+cameraControls.setLookAt(1, 1.7, -4, 1, 1.7, 0);
+
+function animate() {
+  const delta = clock.getDelta();
+	cameraControls.update( delta );
+	renderer.render( scene, camera );
   requestAnimationFrame(animate);
-};
+}
 
 animate();
 
-//Adjust the viewport to the size of the browser
-window.addEventListener("resize", () => {
-  (size.width = window.innerWidth), (size.height = window.innerHeight);
-  camera.aspect = size.width / size.height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(size.width, size.height);
-});
+// Load 3D scan
+
+const loader = new GLTFLoader();
+
+const loadingElem = document.querySelector('#loader-container');
+const loadingText = loadingElem.querySelector('p');
+
+loader.load(
+	// resource URL
+	'./models/gltf/Room Divider.glb',
+	// called when the resource is loaded
+	( gltf ) => {
+
+    loadingElem.style.display = 'none';
+		scene.add( gltf.scene );
+
+	},
+	// called while loading is progressing
+	( progress ) => {
+    const current = (progress.loaded /  progress.total) * 100;
+    const result = Math.min(current, 100); 
+    const formatted = Math.trunc(result * 100) / 100;
+    loadingText.textContent = `Loading: ${formatted}%`;
+	},
+	// called when loading has errors
+	( error ) => {
+
+		console.log( 'An error happened: ', error );
+
+	}
+);
